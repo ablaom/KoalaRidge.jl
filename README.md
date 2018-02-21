@@ -143,6 +143,7 @@ standardize             |true
                  TotalBsmtSF (+) │ 0.0                                    │ 
                   GarageArea (+) │ 0.0                                    │ 
                                  └────────────────────────────────────────┘ 
+````                           
 
 Tune lambda using cross-validation:
 
@@ -159,7 +160,7 @@ Set lambda to the optimal value and do final train:
     julia> ridge.lambda = lambdas[indmin(rmserrors)]
     2.25701971963392
 
-	 julia> fit!(ridgeM, train)
+    julia> fit!(ridgeM, train)
 	 SupervisedMachine{RidgeRegressor}@...817
 
 	 julia> err(ridgeM, test)
