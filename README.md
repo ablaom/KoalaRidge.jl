@@ -157,7 +157,7 @@ Set lambda to the optimal value and do final train:
 
 ````julia
     julia> ridge.lambda = lambdas[indmin(rmserrors)]
-	 2.25701971963392
+    2.25701971963392
 
 	 julia> fit!(ridgeM, train)
 	 SupervisedMachine{RidgeRegressor}@...817
