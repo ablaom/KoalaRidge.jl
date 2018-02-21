@@ -9,7 +9,6 @@ implementation of ridge regression.
 ````julia
     julia> using Koala
     julia> using KoalaRidge
-    julia> using Base.Test
 ````
 
 Load some data and define train/test rows:
