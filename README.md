@@ -161,8 +161,8 @@ Set lambda to the optimal value and do final train:
     2.25701971963392
 
     julia> fit!(ridgeM, train)
-	 SupervisedMachine{RidgeRegressor}@...817
+    SupervisedMachine{RidgeRegressor}@...817
 
-	 julia> err(ridgeM, test)
-	 0.13403786668784523
+    julia> err(ridgeM, test)
+    0.13403786668784523
 ````
