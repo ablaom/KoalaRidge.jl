@@ -24,9 +24,9 @@ Instantiate a model:
 
 ````julia
     julia> ridge = RidgeRegressor(lambda=0.1, standardize=true, boxcox_inputs=true)
-	RidgeRegressor@...402
+    RidgeRegressor@...402
 	
-	julia> showall(ridge)
+    julia> showall(ridge)
     RidgeRegressor@...402
 ````
 
@@ -39,7 +39,7 @@ lambda                  |0.1
 shift                   |true
 standardize             |true
 	
-# Build a machine:
+Build a machine:
 
 ````julia
     julia> ridgeM = SupervisedMachine(ridge, X, y, train)
@@ -65,7 +65,7 @@ standardize             |true
     SupervisedMachine{RidgeRegressor}@...817
 
     julia> showall(ridgeM)
-	SupervisedMachine{RidgeRegressor}@...817
+	 SupervisedMachine{RidgeRegressor}@...817
 ````
 
 key                     | value
@@ -144,10 +144,10 @@ standardize             |true
                   GarageArea (+) │ 0.0                                    │ 
                                  └────────────────────────────────────────┘ 
 
-Tne lambda using cross-validation:
+Tune lambda using cross-validation:
 
 ````julia
-	julia> lambdas, rmserrors = @curve λ logspace(-3,1,100) begin
+	 julia> lambdas, rmserrors = @curve λ logspace(-3,1,100) begin
                ridge.lambda = λ
                mean(cv(ridgeM, train, n_folds=9, verbosity=0))
            end;
@@ -157,11 +157,11 @@ Set lambda to the optimal value and do final train:
 
 ````julia
     julia> ridge.lambda = lambdas[indmin(rmserrors)]
-	2.25701971963392
+	 2.25701971963392
 
-	julia> fit!(ridgeM, train)
-	SupervisedMachine{RidgeRegressor}@...817
+	 julia> fit!(ridgeM, train)
+	 SupervisedMachine{RidgeRegressor}@...817
 
-	julia> err(ridgeM, test)
-	0.13403786668784523
+	 julia> err(ridgeM, test)
+	 0.13403786668784523
 ````
