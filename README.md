@@ -1,6 +1,6 @@
-# KoalaRidge
+# ![logo](logo.png) KoalaRidge.jl
 
-A Koala wrap of the
+> A Koala wrap of the
 [`MultivariateStats.jl`](https://github.com/JuliaStats/MultivariateStats.jl)
 implementation of ridge regression.
 
@@ -15,7 +15,7 @@ Load some data and define train/test rows:
 
 ````julia
     julia> const X, y = load_ames();
-    julia> y = log.(y);              # log of the SalePrice
+    julia> y = log.(y);  # log of the SalePrice
     julia> const train, test = splitrows(eachindex(y), 0.7); # 70:30 split
 ````
 
