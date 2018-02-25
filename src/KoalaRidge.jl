@@ -4,17 +4,18 @@ module KoalaRidge
 export RidgeRegressor # eg, RidgeRegressor
 
 # needed in this module:
-import Koala: Regressor, BaseType, keys_ordered_by_values, SupervisedMachine
-import Koala: params
+import Koala: Regressor, BaseType, SupervisedMachine, Transformer
+import Koala: params, keys_ordered_by_values
 import DataFrames: AbstractDataFrame, DataFrame
-import KoalaTransforms: BoxCoxScheme, HotEncodingScheme
-import KoalaTransforms: UnivariateBoxCoxScheme, UnivariateStandardizationScheme
+import KoalaTransforms: OneHotEncoder, OneHotEncoderScheme
+import KoalaTransforms: BoxCoxTransformer, BoxCoxTransformerScheme
+import KoalaTransforms: UnivariateStandardizer, UnivariateBoxCoxTransformer
 import MultivariateStats
 import UnicodePlots
 
 # to be extended (but not explicitly rexported):
 import Koala: setup, fit, predict
-import Koala: get_scheme_X, get_scheme_y, transform, inverse_transform
+import Koala: get_transformer_X, get_transformer_y, transform, inverse_transform
 
 
 ## Model type definitions
@@ -70,42 +71,34 @@ RidgeRegressor(; lambda=0.0, boxcox_inputs::Bool=false,
                    RidgeRegressor(lambda, boxcox_inputs, boxcox, standardize,
                                   shift, drop_last)
 
-mutable struct Scheme_X <: BaseType
-    boxcox::BoxCoxScheme
-    hot::HotEncodingScheme
+struct Transformer_X <: Transformer
+    boxcox_inputs::Bool # whether to apply Box-Cox transformations to the input patterns
+    shift::Bool # do we shift away from zero in Box-Cox transformations?
+    drop_last::Bool # do we drop the last slot in the one-hot-encoding?
+end
+
+struct Transformer_y <: Transformer
+    boxcox::Bool # do we apply Box-Cox transforms to target (before any standarization)?
+    standardize::Bool # do we standardize targets?
+    shift::Bool # do we shift away from zero in Box-Cox transformations?
+end
+
+struct Scheme_X <: BaseType
+    boxcox::BoxCoxTransformerScheme
+    hot::OneHotEncoderScheme
     features::Vector{Symbol}
     spawned_features::Vector{Symbol} # ie after one-hot encoding
 end
 
-# `showall` method for `ElasticNetRegressor` machines:
-function Base.showall(stream::IO,
-                      mach::SupervisedMachine{LinearPredictor, RidgeRegressor})
-    show(stream, mach)
-    println(stream)
-    if isdefined(mach,:report) && :feature_importance_curve in keys(mach.report)
-        features, importance = mach.report[:feature_importance_curve]
-        plt = UnicodePlots.barplot(features, importance,
-              title="Feature importance (coefs of linear predictor)")
-    end
-    dict = params(mach)
-    report_items = sort(collect(keys(dict[:report])))
-    dict[:report] = "Dict with keys: $report_items"
-    dict[:Xt] = string(typeof(mach.Xt), " of shape ", size(mach.Xt))
-    dict[:yt] = string(typeof(mach.yt), " of shape ", size(mach.yt))
-    delete!(dict, :cache)
-    showall(stream, dict)
-    println(stream, "\nModel detail:")
-    showall(stream, mach.model)
-    if isdefined(mach,:report) && :feature_importance_curve in keys(mach.report)
-        show(stream, plt)
-    end
+struct Scheme_y <: BaseType
+    boxcox::Tuple{Float64,Float64}
+    standard::Tuple{Float64,Float64}
 end
-    
-function get_scheme_X(model::RidgeRegressor, X::AbstractDataFrame,
-                      train_rows, features) 
-    
-    X = X[train_rows, features]
 
+function fit(transformer::Transformer_X, X::AbstractDataFrame, parallel, verbosity)
+
+    features = names(X)
+    
     # check `X` has only string and real eltypes:
     eltypes_ok = true
     for ft in features
@@ -117,74 +110,85 @@ function get_scheme_X(model::RidgeRegressor, X::AbstractDataFrame,
     eltypes_ok || error("Only AbstractString and Real eltypes allowed in DataFrame.")
 
     # fit Box-Cox transformation:
-    if model.boxcox_inputs
+    if transformer.boxcox_inputs
         info("Computing input Box-Cox transformations.")
-        boxcox = BoxCoxScheme(X, shift=model.shift)
-        X = transform(boxcox, X)
+        boxcox_transformer = BoxCoxTransformer(shift=transformer.shift)
+        boxcox = fit(boxcox_transformer, X, true, verbosity - 1)
+        X = transform(boxcox_transformer, boxcox, X)
     else
-        boxcox = BoxCoxScheme()
+        boxcox = BoxCoxTransformerScheme() # null scheme
     end
 
     info("Determining one-hot encodings for inputs.")
-    hot =  HotEncodingScheme(X, drop_last=model.drop_last)
+    hot_transformer = OneHotEncoder(drop_last=transformer.drop_last)
+    hot =  fit(hot_transformer, X, true, verbosity - 1) 
     spawned_features = hot.spawned_features    
 
     return Scheme_X(boxcox, hot, features, spawned_features)
 
 end
 
-function transform(model::RidgeRegressor, scheme_X, X::AbstractDataFrame)
+function transform(transformer::Transformer_X, scheme_X, X::AbstractDataFrame)
     issubset(Set(scheme_X.features), Set(names(X))) ||
         error("DataFrame feature incompatibility encountered.")
     X = X[scheme_X.features]
-    if model.boxcox_inputs
-        X = transform(scheme_X.boxcox, X)
+    if transformer.boxcox_inputs
+        boxcox_transformer = BoxCoxTransformer(shift=transformer.shift)
+        X = transform(boxcox_transformer, scheme_X.boxcox, X)
     end
-    X = transform(scheme_X.hot, X)
+    hot_transformer = OneHotEncoder(drop_last=transformer.drop_last)
+    X = transform(hot_transformer, scheme_X.hot, X)
     return convert(Array{Float64}, X)
 end
 
-mutable struct Scheme_y <: BaseType
-    boxcox::UnivariateBoxCoxScheme
-    standard::UnivariateStandardizationScheme
-end
+function fit(transformer::Transformer_y, y, parallel, verbosity)
 
-function get_scheme_y(model::RidgeRegressor, y, test_rows)
-    y = y[test_rows]
-    if model.boxcox
+    if transformer.boxcox
         info("Computing Box-Cox transformations for target.")
-        boxcox = UnivariateBoxCoxScheme(y, shift=model.shift)
-        y = transform(boxcox, y)
+        boxcox_transformer = UnivariateBoxCoxTransformer(shift=transformer.shift)
+        boxcox = fit(boxcox_transformer, y, true, verbosity - 1)
+        y = transform(boxcox_transformer, boxcox, y)
     else
-        boxcox = UnivariateBoxCoxScheme()
+        boxcox = (0.0, 0.0) # null scheme
     end
-    if model.standardize
+    if transformer.standardize
         info("Computing target standardization.")
-        standard = UnivariateStandardizationScheme(y)
+        standard_transformer = UnivariateStandardizer()
+        standard = fit(standard_transformer, y, true, verbosity - 1)
     else
-        standard = UnivariateStandardizationScheme()
+        standard = (0.0, 1.0) # null scheme
     end
     return Scheme_y(boxcox, standard)
 end 
-                          
-function transform(model::RidgeRegressor, scheme_y , y::Vector{T} where T <: Real)
-    if model.boxcox
-        y = transform(scheme_y.boxcox, y)
+
+function transform(transformer::Transformer_y, scheme_y, y)
+    if transformer.boxcox
+        boxcox_transformer = UnivariateBoxCoxTransformer(shift=transformer.shift)
+        y = transform(boxcox_transformer, scheme_y.boxcox, y)
     end
-    if model.standardize
-        y = transform(scheme_y.standard, y)
+    if transformer.standardize
+        standard_transformer = UnivariateStandardizer()
+        y = transform(standard_transformer, scheme_y.standard, y)
     end 
     return y
 end 
 
-function inverse_transform(model::RidgeRegressor, scheme_y, yt::AbstractVector)
-    y = inverse_transform(scheme_y.standard, yt)
-    if model.boxcox
-        return inverse_transform(scheme_y.boxcox, y)
-    else
-        return y
+function inverse_transform(transformer::Transformer_y, scheme_y, y)
+    if transformer.standardize
+        standard_transformer = UnivariateStandardizer()
+        y = inverse_transform(standard_transformer, scheme_y.standard, y)
     end
-end 
+    if transformer.boxcox
+        boxcox_transformer = UnivariateBoxCoxTransformer(shift=transformer.shift)
+        y = inverse_transform(boxcox_transformer, scheme_y.boxcox, y)
+    end
+    return y
+end
+
+get_transformer_X(model::RidgeRegressor) =
+    Transformer_X(model.boxcox_inputs, model.shift, model.drop_last)
+get_transformer_y(model::RidgeRegressor) =
+    Transformer_y(model.boxcox, model.standardize, model.shift)
 
 struct Cache <: BaseType
     X::Matrix{Float64}
