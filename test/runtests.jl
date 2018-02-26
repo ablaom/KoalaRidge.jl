@@ -9,11 +9,14 @@ y = log.(y) # log of the SalePrice
 const train, test = splitrows(eachindex(y), 0.7); # 70:30 split
 
 # Instantiate a model:
-ridge = RidgeRegressor(lambda=0.1, standardize=true, boxcox_inputs=true)
+ridge = RidgeRegressor(lambda=0.1)
+ty = default_transformer_y(ridge)
+ty.boxcox = false
+showall(ty)
 showall(ridge)
 
 # Build a machine:
-ridgeM = SupervisedMachine(ridge, X, y, train)
+ridgeM = Machine(ridge, X, y, train, transformer_y=ty)
 
 fit!(ridgeM, train)
 showall(ridgeM)
