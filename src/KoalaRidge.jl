@@ -60,9 +60,9 @@ end
 RidgeRegressor(; lambda=0.0) = RidgeRegressor(lambda)
 
 default_transformer_X(model::RidgeRegressor) =
-    KoalaTransforms.TransformerForLinearModels_X()
+    KoalaTransforms.DataFrameToArrayTransformer()
 default_transformer_y(model::RidgeRegressor) =
-    KoalaTransforms.TransformerForLinearModels_y()
+    KoalaTransforms.RegressionTargetTransformer()
 
 struct Cache <: BaseType
     X::Matrix{Float64}

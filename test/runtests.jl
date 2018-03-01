@@ -6,7 +6,7 @@ using Base.Test
 const X, y = load_ames();
 y = log.(y) # log of the SalePrice
 
-const train, test = splitrows(eachindex(y), 0.7); # 70:30 split
+const train, test = split(eachindex(y), 0.7); # 70:30 split
 
 # Instantiate a model:
 ridge = RidgeRegressor(lambda=0.1)
