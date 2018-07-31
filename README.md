@@ -1,6 +1,6 @@
 # ![logo](logo.png) KoalaRidge.jl
 
-> A Koala wrap of the
+> A [Koala](https://github.com/ablaom/Koala.jl) wrap of the
 [`MultivariateStats.jl`](https://github.com/JuliaStats/MultivariateStats.jl)
 implementation of ridge regression.
 
